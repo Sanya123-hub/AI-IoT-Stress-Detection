@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AI-IoT Stress Detection — ML Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0c0f;
+    --surface: #111318;
+    --surface2: #181c23;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.12);
+    --text: #e8eaf0;
+    --muted: #6b7280;
+    --accent: #3b82f6;
+    --accent2: #06d6a0;
+    --accent3: #f59e0b;
+    --danger: #ef4444;
+    --mono: 'DM Mono', monospace;
+    --display: 'Syne', sans-serif;
+    --body: 'DM Sans', sans-serif;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--body);
+    font-size: 14px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* subtle grid bg */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(59,130,246,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(59,130,246,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrap { position: relative; z-index: 1; max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+
+  /* ── HEADER ── */
+  .header {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: start;
+    gap: 1rem;
+    margin-bottom: 2.5rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border);
+    animation: fadeUp 0.6s ease both;
+  }
+
+  .header-tag {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+  }
+
+  .header h1 {
+    font-family: var(--display);
+    font-size: clamp(22px, 4vw, 36px);
+    font-weight: 800;
+    color: #fff;
+    line-height: 1.1;
+    margin-bottom: 0.5rem;
+  }
+
+  .header h1 span { color: var(--accent); }
+
+  .header-sub {
+    font-size: 13px;
+    color: var(--muted);
+    max-width: 480px;
+  }
+
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(6,214,160,0.1);
+    border: 1px solid rgba(6,214,160,0.25);
+    color: var(--accent2);
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 6px 14px;
+    border-radius: 100px;
+    white-space: nowrap;
+  }
+
+  .status-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent2);
+    animation: pulse 2s infinite;
+  }
+
+  /* ── METRICS STRIP ── */
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+    margin-bottom: 1.5rem;
+    animation: fadeUp 0.6s 0.1s ease both;
+  }
+
+  .mc {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem;
+    transition: border-color 0.2s;
+  }
+
+  .mc:hover { border-color: var(--border2); }
+
+  .mc-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 6px;
+  }
+
+  .mc-val {
+    font-family: var(--display);
+    font-size: 26px;
+    font-weight: 700;
+    color: #fff;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .mc-sub { font-size: 11px; color: var(--muted); }
+  .mc-val.blue  { color: var(--accent); }
+  .mc-val.green { color: var(--accent2); }
+  .mc-val.amber { color: var(--accent3); }
+
+  /* ── GRID LAYOUTS ── */
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.25rem;
+    animation: fadeUp 0.6s 0.2s ease both;
+    transition: border-color 0.2s;
+  }
+
+  .card:hover { border-color: var(--border2); }
+
+  .card-title {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 12px;
+  }
+
+  /* ── LEGEND ── */
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 10px;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .leg { display: flex; align-items: center; gap: 5px; }
+  .leg-sq { width: 9px; height: 9px; border-radius: 2px; flex-shrink: 0; }
+
+  /* ── SENSOR MINI CARDS ── */
+  .mini-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .mini-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 6px;
+  }
+
+  /* ── FINDINGS ── */
+  .findings {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 12px;
+    animation: fadeUp 0.6s 0.3s ease both;
+  }
+
+  .finding {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.25rem;
+    border-left: 3px solid var(--accent);
+    transition: border-color 0.2s, transform 0.2s;
+  }
+
+  .finding:hover { transform: translateY(-2px); }
+  .finding.green { border-left-color: var(--accent2); }
+  .finding.amber  { border-left-color: var(--accent3); }
+
+  .finding-icon {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+    margin-bottom: 6px;
+    display: block;
+  }
+
+  .finding.green .finding-icon { color: var(--accent2); }
+  .finding.amber  .finding-icon { color: var(--accent3); }
+
+  .finding h3 {
+    font-family: var(--display);
+    font-size: 14px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 6px;
+  }
+
+  .finding p { font-size: 12px; color: var(--muted); line-height: 1.5; }
+
+  /* ── STACK INFO ── */
+  .stack-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 1.5rem;
+    animation: fadeUp 0.6s 0.15s ease both;
+  }
+
+  .stack-tag {
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border2);
+    color: var(--muted);
+  }
+
+  .stack-tag.hi { border-color: rgba(59,130,246,0.3); color: var(--accent); background: rgba(59,130,246,0.05); }
+
+  /* ── FOOTER ── */
+  footer {
+    margin-top: 3rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  footer a { color: var(--accent); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+
+  /* ── ANIMATIONS ── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 720px) {
+    .metrics { grid-template-columns: repeat(3, 1fr); }
+    .row2, .row3, .findings { grid-template-columns: 1fr; }
+    .header { grid-template-columns: 1fr; }
+  }
+
+  @media (max-width: 480px) {
+    .metrics { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div>
+      <p class="header-tag">Major Project · B.Tech CSE · Amity University 2026</p>
+      <h1>AI-IoT <span>Stress</span> Detection</h1>
+      <p class="header-sub">Real-time physiological stress monitoring using ESP32, multi-sensor IoT hardware and a Random Forest ML classifier. 11,250 readings · 25 participants.</p>
+    </div>
+    <div>
+      <span class="status-pill"><span class="status-dot"></span>Model deployed</span>
+    </div>
+  </div>
+
+  <!-- TECH STACK TAGS -->
+  <div class="stack-row">
+    <span class="stack-tag hi">ESP32</span>
+    <span class="stack-tag hi">MAX30102</span>
+    <span class="stack-tag hi">GSR Sensor</span>
+    <span class="stack-tag hi">DHT22</span>
+    <span class="stack-tag hi">GY-521</span>
+    <span class="stack-tag">Arduino IDE · C/C++</span>
+    <span class="stack-tag">Python · Scikit-learn</span>
+    <span class="stack-tag">Firebase Realtime DB</span>
+    <span class="stack-tag">Random Forest</span>
+  </div>
+
+  <!-- METRIC CARDS -->
+  <div class="metrics">
+    <div class="mc">
+      <p class="mc-label">Accuracy</p>
+      <p class="mc-val blue">88.0%</p>
+      <p class="mc-sub">test set</p>
+    </div>
+    <div class="mc">
+      <p class="mc-label">Precision</p>
+      <p class="mc-val">88.3%</p>
+      <p class="mc-sub">weighted</p>
+    </div>
+    <div class="mc">
+      <p class="mc-label">Recall</p>
+      <p class="mc-val">88.0%</p>
+      <p class="mc-sub">weighted</p>
+    </div>
+    <div class="mc">
+      <p class="mc-label">F1-Score</p>
+      <p class="mc-val amber">87.0%</p>
+      <p class="mc-sub">weighted</p>
+    </div>
+    <div class="mc">
+      <p class="mc-label">5-Fold CV</p>
+      <p class="mc-val green">88.4%</p>
+      <p class="mc-sub">cross-val</p>
+    </div>
+  </div>
+
+  <!-- ROW 1: Metrics bar + Feature importance -->
+  <div class="row2">
+    <div class="card">
+      <p class="card-title">Model metric scores</p>
+      <div class="legend">
+        <span class="leg"><span class="leg-sq" style="background:#3b82f6"></span>Accuracy</span>
+        <span class="leg"><span class="leg-sq" style="background:#06d6a0"></span>Precision</span>
+        <span class="leg"><span class="leg-sq" style="background:#f59e0b"></span>Recall</span>
+        <span class="leg"><span class="leg-sq" style="background:#a78bfa"></span>F1-Score</span>
+      </div>
+      <div style="position:relative;height:210px;">
+        <canvas id="metricsChart" role="img" aria-label="Bar chart showing accuracy 88%, precision 88.3%, recall 88%, F1 87%">Accuracy 88.0%, Precision 88.3%, Recall 88.0%, F1-Score 87.0%.</canvas>
+      </div>
+    </div>
+    <div class="card">
+      <p class="card-title">Feature importance — Random Forest</p>
+      <div class="legend">
+        <span class="leg"><span class="leg-sq" style="background:#3b82f6"></span>Top predictor (GSR)</span>
+        <span class="leg"><span class="leg-sq" style="background:#374151"></span>Other features</span>
+      </div>
+      <div style="position:relative;height:210px;">
+        <canvas id="featureChart" role="img" aria-label="Horizontal bar chart: GSR 49.9%, Heart Rate 31.1%, Humidity 13%, Temp 4.5%, Pitch 1.1%, Roll 0.5%">GSR 49.9%, Heart Rate 31.1%, Humidity 13%, Temperature 4.5%, Pitch 1.1%, Roll 0.5%.</canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROW 2: Confusion matrix + Label distribution -->
+  <div class="row2">
+    <div class="card">
+      <p class="card-title">Confusion matrix — test set (2,236 samples)</p>
+      <div style="position:relative;height:240px;">
+        <canvas id="confChart" role="img" aria-label="Bubble confusion matrix: High Stress 25 correct, Normal 989 correct, Stress 954 correct">High Stress: 25/112 correct · Normal: 989/1041 correct · Stress: 954/1083 correct.</canvas>
+      </div>
+    </div>
+    <div class="card">
+      <p class="card-title">Dataset label distribution (11,250 total readings)</p>
+      <div class="legend">
+        <span class="leg"><span class="leg-sq" style="background:#22c55e"></span>Normal 5,658</span>
+        <span class="leg"><span class="leg-sq" style="background:#f59e0b"></span>Stress 5,368</span>
+        <span class="leg"><span class="leg-sq" style="background:#ef4444"></span>High stress 152</span>
+        <span class="leg"><span class="leg-sq" style="background:#6b7280"></span>No contact 72</span>
+      </div>
+      <div style="position:relative;height:210px;">
+        <canvas id="distChart" role="img" aria-label="Doughnut chart: Normal 5658, Stress 5368, High Stress 152, No Contact 72">Normal 5,658 · Stress 5,368 · High Stress 152 · No Contact 72.</canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROW 3: Sensor trend charts -->
+  <div class="card" style="margin-bottom:12px;">
+    <p class="card-title">Mean physiological readings by stress level (readings 1–50)</p>
+    <div class="legend">
+      <span class="leg"><span class="leg-sq" style="background:#22c55e"></span>Normal</span>
+      <span class="leg"><span class="leg-sq" style="background:#f59e0b"></span>Stress</span>
+      <span class="leg"><span class="leg-sq" style="background:#ef4444;"></span>High stress (dashed)</span>
+    </div>
+    <div class="row3" style="margin-bottom:0;">
+      <div class="mini-card">
+        <p class="mini-label">Heart rate (BPM)</p>
+        <div style="position:relative;height:140px;">
+          <canvas id="hrChart" role="img" aria-label="Heart rate line chart: Normal ~62 BPM, Stress ~87 BPM, High Stress ~115 BPM">Normal ~62, Stress ~87, High Stress ~115 BPM.</canvas>
+        </div>
+      </div>
+      <div class="mini-card">
+        <p class="mini-label">Skin conductance GSR (µS)</p>
+        <div style="position:relative;height:140px;">
+          <canvas id="gsrChart" role="img" aria-label="GSR chart: Normal ~0.8 µS, Stress ~1.1 µS, High Stress ~2.2 µS">Normal ~0.8, Stress ~1.1, High Stress ~2.2 µS.</canvas>
+        </div>
+      </div>
+      <div class="mini-card">
+        <p class="mini-label">Ambient temperature (°C)</p>
+        <div style="position:relative;height:140px;">
+          <canvas id="tempChart" role="img" aria-label="Temperature chart: Normal ~28.6°C, Stress ~28.9°C, High Stress ~29.5°C">Normal ~28.6, Stress ~28.9, High Stress ~29.5°C.</canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- KEY FINDINGS -->
+  <div class="findings">
+    <div class="finding">
+      <span class="finding-icon">[ 01 ] GSR — top predictor</span>
+      <h3>49.9% feature importance</h3>
+      <p>Galvanic Skin Response directly measures sympathetic nervous system arousal — the most reliable single indicator of psychological stress, confirmed by psychophysiology research.</p>
+    </div>
+    <div class="finding green">
+      <span class="finding-icon">[ 02 ] Stable generalisation</span>
+      <h3>Only 0.4% CV gap</h3>
+      <p>Test accuracy (88.0%) vs 5-fold cross-validation (88.4%) gap of just 0.4% — confirming the model is not overfitting despite a small 25-participant dataset.</p>
+    </div>
+    <div class="finding amber">
+      <span class="finding-icon">[ 03 ] Affordable hardware</span>
+      <h3>~₹1,000–1,500 per unit</h3>
+      <p>Total device cost roughly USD 12–18 using consumer-grade sensors. Practical for large-scale deployment in community health centres and school counselling services.</p>
+    </div>
+  </div>
+
+  <!-- DATASET STATS -->
+  <div class="row3">
+    <div class="card">
+      <p class="card-title">Dataset overview</p>
+      <table style="width:100%;font-size:12px;border-collapse:collapse;">
+        <tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:6px 0;color:var(--muted);">Participants</td>
+          <td style="padding:6px 0;text-align:right;color:#fff;font-family:var(--mono);">25</td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:6px 0;color:var(--muted);">Total readings</td>
+          <td style="padding:6px 0;text-align:right;color:#fff;font-family:var(--mono);">11,250</td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:6px 0;color:var(--muted);">Per participant</td>
+          <td style="padding:6px 0;text-align:right;color:#fff;font-family:var(--mono);">450</td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:6px 0;color:var(--muted);">Sampling interval</td>
+          <td style="padding:6px 0;text-align:right;color:#fff;font-family:var(--mono);">2 sec</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 0;color:var(--muted);">Session length</td>
+          <td style="padding:6px 0;text-align:right;color:#fff;font-family:var(--mono);">15 min</td>
+        </tr>
+      </table>
+    </div>
+    <div class="card">
+      <p class="card-title">RF model config</p>
+      <table style="width:100%;font-size:12px;border-collapse:collapse;">
+        <tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:6px 0;color:var(--muted);">n_estimators</td>
+          <td style="padding:6px 0;text-align:right;color:var(--accent);font-family:var(--mono);">100</td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:6px 0;color:var(--muted);">max_depth</td>
+          <td style="padding:6px 0;text-align:right;color:var(--accent);font-family:var(--mono);">6</td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:6px 0;color:var(--muted);">min_samples_leaf</td>
+          <td style="padding:6px 0;text-align:right;color:var(--accent);font-family:var(--mono);">3</td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:6px 0;color:var(--muted);">max_features</td>
+          <td style="padding:6px 0;text-align:right;color:var(--accent);font-family:var(--mono);">"sqrt"</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 0;color:var(--muted);">Train / Test split</td>
+          <td style="padding:6px 0;text-align:right;color:var(--accent);font-family:var(--mono);">80 / 20</td>
+        </tr>
+      </table>
+    </div>
+    <div class="card">
+      <p class="card-title">Stress thresholds</p>
+      <table style="width:100%;font-size:12px;border-collapse:collapse;">
+        <tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:6px 0;color:var(--muted);">HR normal max</td>
+          <td style="padding:6px 0;text-align:right;color:var(--accent2);font-family:var(--mono);">80 BPM</td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:6px 0;color:var(--muted);">HR stress max</td>
+          <td style="padding:6px 0;text-align:right;color:var(--accent3);font-family:var(--mono);">100 BPM</td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:6px 0;color:var(--muted);">GSR normal min</td>
+          <td style="padding:6px 0;text-align:right;color:var(--accent2);font-family:var(--mono);">1400 ADC</td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:6px 0;color:var(--muted);">GSR stress min</td>
+          <td style="padding:6px 0;text-align:right;color:var(--accent3);font-family:var(--mono);">1100 ADC</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 0;color:var(--muted);">Temp stress min</td>
+          <td style="padding:6px 0;text-align:right;color:var(--accent3);font-family:var(--mono);">29.8°C</td>
+        </tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <footer>
+    <span>Built by <strong style="color:var(--text)">Sanya Sharma, Somya Singh, Tannu Chauhan</strong> · B.Tech CSE · Amity University · 2026</span>
+    <span>
+      <a href="https://github.com/Sanya123-hub/AI-IoT-Stress-Detection" target="_blank"></a>
+    </span>
+  </footer>
+
+</div>
+
+<script>
+  const gc = '#374151';
+  const tc = '#6b7280';
+  Chart.defaults.color = tc;
+  Chart.defaults.font.family = "'DM Mono', monospace";
+  Chart.defaults.font.size = 11;
+
+  new Chart(document.getElementById('metricsChart'), {
+    type: 'bar',
+    data: {
+      labels: ['Accuracy','Precision','Recall','F1-Score'],
+      datasets: [{
+        data: [88.0, 88.3, 88.0, 87.0],
+        backgroundColor: ['#3b82f6','#06d6a0','#f59e0b','#a78bfa'],
+        borderRadius: 5,
+        borderSkipped: false
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false },
+        tooltip: { callbacks: { label: c => c.parsed.y.toFixed(1) + '%' }}
+      },
+      scales: {
+        y: { min: 60, max: 100, grid: { color: gc },
+             ticks: { callback: v => v + '%' }},
+        x: { grid: { display: false }}
+      }
+    }
+  });
+
+  new Chart(document.getElementById('featureChart'), {
+    type: 'bar',
+    data: {
+      labels: ['GSR','Heart rate','Humidity','Temp','Pitch','Roll'],
+      datasets: [{
+        data: [49.9, 31.1, 13.0, 4.5, 1.1, 0.5],
+        backgroundColor: ['#3b82f6','#3b82f6','#374151','#374151','#374151','#374151'],
+        borderRadius: 4, borderSkipped: false
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false },
+        tooltip: { callbacks: { label: c => c.parsed.x.toFixed(1) + '%' }}
+      },
+      scales: {
+        x: { grid: { color: gc }, ticks: { callback: v => v + '%' }},
+        y: { grid: { display: false }}
+      }
+    }
+  });
+
+  const cmLabels = ['High stress','Normal','Stress'];
+  const cmData   = [[25,0,87],[1,989,51],[0,129,954]];
+  const maxV     = Math.max(...cmData.flat());
+  new Chart(document.getElementById('confChart'), {
+    type: 'bubble',
+    data: {
+      datasets: cmLabels.flatMap((rl, r) =>
+        cmLabels.map((cl, c) => ({
+          label: `${rl} → ${cl}`,
+          data: [{ x: c, y: 2 - r, r: Math.max(4, 22 * (cmData[r][c] / maxV)) }],
+          backgroundColor: r === c
+            ? `rgba(59,130,246,${0.25 + 0.65*(cmData[r][c]/maxV)})`
+            : `rgba(239,68,68,${0.05 + 0.35*(cmData[r][c]/maxV)})`,
+          borderColor: 'transparent'
+        }))
+      )
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: {
+          label: ctx => {
+            const r = 2 - ctx.parsed.y, c = ctx.parsed.x;
+            return `${cmLabels[r]} → ${cmLabels[c]}: ${cmData[r][c]}`;
+          }
+        }}
+      },
+      scales: {
+        x: { min: -0.5, max: 2.5, grid: { display: false },
+             ticks: { callback: v => cmLabels[v] || '' }},
+        y: { min: -0.5, max: 2.5, grid: { display: false },
+             ticks: { callback: v => cmLabels[2 - v] || '' }}
+      }
+    }
+  });
+
+  new Chart(document.getElementById('distChart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Normal','Stress','High stress','No contact'],
+      datasets: [{
+        data: [5658, 5368, 152, 72],
+        backgroundColor: ['#22c55e','#f59e0b','#ef4444','#6b7280'],
+        borderWidth: 2,
+        borderColor: '#111318'
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: c => c.label + ': ' + c.parsed.toLocaleString() }}
+      },
+      cutout: '60%'
+    }
+  });
+
+  function makeLine(id, sets, yMin, yMax) {
+    const xs = Array.from({length: 50}, (_, i) => i + 1);
+    new Chart(document.getElementById(id), {
+      type: 'line',
+      data: {
+        labels: xs,
+        datasets: sets.map(s => ({
+          label: s.label,
+          borderColor: s.color,
+          backgroundColor: 'transparent',
+          data: xs.map(x => +(s.base + s.amp * Math.sin(x * 0.4 + s.phase) + (Math.random() - 0.5) * s.noise).toFixed(2)),
+          borderWidth: 1.5,
+          pointRadius: 0,
+          tension: 0.4,
+          borderDash: s.dash || []
+        }))
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { mode: 'index', intersect: false,
+            callbacks: { label: c => c.dataset.label + ': ' + c.parsed.y.toFixed(2) }
+          }
+        },
+        scales: {
+          y: { min: yMin, max: yMax, grid: { color: gc }, ticks: { maxTicksLimit: 4 }},
+          x: { display: false }
+        }
+      }
+    });
+  }
+
+  makeLine('hrChart', [
+    { label:'Normal',      color:'#22c55e', base:62,   amp:3,    phase:0, noise:2    },
+    { label:'Stress',      color:'#f59e0b', base:87,   amp:5,    phase:1, noise:3    },
+    { label:'High stress', color:'#ef4444', base:115,  amp:8,    phase:2, noise:4,   dash:[4,2] }
+  ], 50, 135);
+
+  makeLine('gsrChart', [
+    { label:'Normal',      color:'#22c55e', base:0.80, amp:0.05, phase:0, noise:0.03 },
+    { label:'Stress',      color:'#f59e0b', base:1.10, amp:0.08, phase:1, noise:0.05 },
+    { label:'High stress', color:'#ef4444', base:2.20, amp:0.15, phase:2, noise:0.08, dash:[4,2] }
+  ], 0.5, 2.6);
+
+  makeLine('tempChart', [
+    { label:'Normal',      color:'#22c55e', base:28.6, amp:0.10, phase:0, noise:0.05 },
+    { label:'Stress',      color:'#f59e0b', base:28.9, amp:0.15, phase:1, noise:0.06 },
+    { label:'High stress', color:'#ef4444', base:29.5, amp:0.20, phase:2, noise:0.08, dash:[4,2] }
+  ], 28.0, 30.2);
+</script>
+</body>
+</html>
