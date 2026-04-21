@@ -1,2 +1,5 @@
 # AI-IoT-Stress-Detection
 Real-time physiological stress detection using ESP32, GSR sensor, and Random Forest ML
+This project presents the design, development, and testing of an AI-powered IoT system that detects physiological stress in real time — without relying on subjective self-reported questionnaires.
+Traditional methods for assessing mental health conditions like Generalized Anxiety Disorder (GAD) depend on interviews or scales such as the GAD-7, which only capture a snapshot in time and are prone to bias. This system addresses that gap by continuously monitoring measurable physical signals using wearable sensors and classifying stress levels automatically using a trained machine learning model.
+The system collects data from 4 sensors connected to an ESP32 microcontroller, sends it to Firebase Realtime Database, and visualizes results through a live web dashboard. A Random Forest classifier trained on 11,250 readings from 25 participants achieves 88% accuracy in classifying three stress states: Normal, Stress, and High Stress.
